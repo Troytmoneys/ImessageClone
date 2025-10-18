@@ -20,13 +20,24 @@ app.get('/health', (_req, res) => {
 
 if (hasBuiltClient) {
   app.use(express.static(distPath));
-  app.get('*', (req, res, next) => {
+
+  const spaFallback = (req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      next();
+      return;
+    }
+
     if (req.path.startsWith('/socket.io')) {
       next();
       return;
     }
+
     res.sendFile(path.join(distPath, 'index.html'));
-  });
+  };
+
+  const nonSocketRoute = /^\/(?!socket\.io\/).*/;
+  app.get(nonSocketRoute, spaFallback);
+  app.head(nonSocketRoute, spaFallback);
 }
 
 const httpServer = http.createServer(app);
