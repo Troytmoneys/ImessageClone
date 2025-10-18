@@ -9,16 +9,20 @@ import { Server } from 'socket.io';
 const app = express();
 app.use(cors());
 
+const httpServer = http.createServer(app);
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.resolve(__dirname, '../dist');
-const hasBuiltClient = fs.existsSync(distPath);
+const indexHtmlPath = path.resolve(__dirname, '../index.html');
+const isDevMode = process.argv.includes('--dev');
+const serveBuiltClient = !isDevMode && fs.existsSync(distPath);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-if (hasBuiltClient) {
+if (serveBuiltClient) {
   app.use(express.static(distPath));
 
   const spaFallback = (req, res, next) => {
@@ -38,16 +42,58 @@ if (hasBuiltClient) {
   const nonSocketRoute = /^\/(?!socket\.io\/).*/;
   app.get(nonSocketRoute, spaFallback);
   app.head(nonSocketRoute, spaFallback);
+} else {
+  const { createServer: createViteServer } = await import('vite');
+  const vite = await createViteServer({
+    configFile: path.resolve(__dirname, '../vite.config.js'),
+    server: {
+      middlewareMode: true,
+      hmr: {
+        server: httpServer,
+      },
+    },
+    appType: 'custom',
+  });
+
+  app.use(vite.middlewares);
+
+  app.use(async (req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      next();
+      return;
+    }
+
+    if (req.originalUrl.startsWith('/socket.io')) {
+      next();
+      return;
+    }
+
+    try {
+      if (req.method === 'HEAD') {
+        res.status(200).end();
+        return;
+      }
+      const url = req.originalUrl;
+      let template = await fs.promises.readFile(indexHtmlPath, 'utf-8');
+      template = await vite.transformIndexHtml(url, template);
+      res
+        .status(200)
+        .set({ 'Content-Type': 'text/html' })
+        .end(template);
+    } catch (error) {
+      vite.ssrFixStacktrace?.(error);
+      next(error);
+    }
+  });
 }
 
-const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: '*',
   },
 });
 
-const PORT = process.env.PORT ?? 5174;
+const PORT = Number(process.env.PORT ?? 8888);
 
 const directory = {
   'u-alex': {

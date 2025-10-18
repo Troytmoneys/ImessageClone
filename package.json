@@ -4,9 +4,9 @@
   "description": "Modern web-based clone of Apple's iMessage and FaceTime experiences.",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node server/index.js --dev",
     "server": "node server/index.js",
-    "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
+    "dev:full": "npm run dev",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "npm run build && node server/index.js"
