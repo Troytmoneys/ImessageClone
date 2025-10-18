@@ -6,6 +6,6 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
-    allowedHosts: ['devserver-main--imessageclone.netlify.app']
+    allowedHosts: ['https://devserver-main--imessageclone.netlify.app']
   }
 });
